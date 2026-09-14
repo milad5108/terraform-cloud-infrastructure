@@ -4,7 +4,7 @@ A portfolio-focused Infrastructure as Code project built with Terraform and AWS.
 
 This project demonstrates how cloud infrastructure can be defined, structured, validated, and version-controlled using Terraform.
 
-> Note: The current project has been locally initialized and validated with Terraform. Real AWS provisioning has not yet been performed because an active AWS account with billing access is not currently available.
+> Note: The current project has been locally initialized and validated with Terraform. Real AWS provisioning has not yet been performed because an active AWS account with valid AWS credentials is not currently available.
 
 ---
 
@@ -94,7 +94,10 @@ terraform-cloud-infrastructure/
 │   ├── versions.tf
 │   └── .terraform.lock.hcl
 ├── docs/
+│   └── architecture.md
 ├── screenshots/
+│   ├── terraform-plan-no-credentials.png
+│   └── terraform-validate-success.png
 ├── .gitignore
 └── README.md
 ```
@@ -130,6 +133,8 @@ Public subnets:
 
 The two public subnets are configured in separate Availability Zones.
 
+An Internet Gateway and public route table provide internet routing for the public subnets.
+
 ---
 
 ## Security
@@ -157,7 +162,7 @@ This SSH rule should be restricted to a trusted IP address before any real deplo
 
 Terraform state files, variable files, private keys, environment files, and other sensitive files are excluded through `.gitignore`.
 
-No AWS credentials are stored in this repository.
+No AWS credentials or secrets are stored in this repository.
 
 ---
 
@@ -193,6 +198,9 @@ Internet
 Application Load Balancer
    |
    v
+HTTP Listener
+   |
+   v
 Target Group
    |
    v
@@ -200,6 +208,8 @@ EC2 Instance
 ```
 
 The listener accepts HTTP traffic on port 80.
+
+The load balancer is configured to use both public subnets across separate Availability Zones.
 
 ---
 
@@ -252,6 +262,38 @@ Validation result:
 Success! The configuration is valid.
 ```
 
+A real `terraform plan` was also attempted.
+
+Terraform successfully detected the AWS configuration, but the planning process stopped because valid AWS credentials are not currently available.
+
+Observed error:
+
+```text
+Error: No valid credential sources found
+```
+
+This means the project has reached the current boundary of what can be verified locally without an authenticated AWS account.
+
+---
+
+## Validation Evidence
+
+### Terraform Validate
+
+The Terraform configuration passed local validation successfully:
+
+![Terraform Validate Success](screenshots/terraform-validate-success.png)
+
+### Terraform Plan
+
+A real Terraform plan was attempted against the AWS provider.
+
+The process stopped at AWS authentication because no valid AWS credentials are currently available:
+
+![Terraform Plan Without AWS Credentials](screenshots/terraform-plan-no-credentials.png)
+
+The current limitation is AWS authentication, not Terraform syntax validation.
+
 ---
 
 ## Deployment Status
@@ -261,7 +303,9 @@ Terraform configuration: COMPLETE
 Terraform initialization: COMPLETE
 Terraform formatting: COMPLETE
 Terraform validation: COMPLETE
+Terraform plan attempt: COMPLETED UNTIL AWS AUTHENTICATION
 
+AWS authentication: NOT AVAILABLE
 AWS real deployment: NOT YET PERFORMED
 terraform apply: NOT YET PERFORMED
 Cloud resource validation: NOT YET PERFORMED
@@ -269,6 +313,8 @@ terraform destroy validation: NOT YET PERFORMED
 ```
 
 The project does not claim that the infrastructure has been deployed to a real AWS environment.
+
+Real AWS deployment will only be documented after successful provisioning and verification.
 
 ---
 
@@ -288,10 +334,17 @@ Before real deployment:
 
 ## Terraform Workflow
 
+Current validated workflow:
+
 ```bash
 terraform init
 terraform fmt
 terraform validate
+```
+
+Planned authenticated AWS workflow:
+
+```bash
 terraform plan
 terraform apply
 ```
@@ -302,7 +355,30 @@ Cleanup:
 terraform destroy
 ```
 
-At the current stage, only the non-billable local validation workflow has been completed.
+At the current stage, the non-billable local validation workflow has been completed.
+
+`terraform plan` was attempted but could not proceed beyond AWS authentication because valid credentials are not currently available.
+
+---
+
+## Architecture Documentation
+
+Additional infrastructure architecture documentation is available here:
+
+```text
+docs/architecture.md
+```
+
+It includes:
+
+- Network design
+- VPC structure
+- Subnet architecture
+- Security configuration
+- EC2 design
+- Application Load Balancer traffic flow
+- Current validation state
+- Future architecture improvements
 
 ---
 
@@ -313,14 +389,15 @@ Planned improvements:
 - Real AWS deployment
 - Cloud-side validation
 - Restrict SSH access
+- Separate Load Balancer and EC2 Security Groups
 - HTTPS listener
 - ACM certificate integration
-- Improved security group separation
 - Remote Terraform state
 - Terraform modules
 - CI validation workflow
-- Architecture screenshots
 - Deployment evidence
+- Application Load Balancer health validation
+- EC2 connectivity validation
 - Destroy and cleanup validation
 
 ---
@@ -329,4 +406,6 @@ Planned improvements:
 
 This project is part of a DevOps portfolio focused on practical and verifiable skills.
 
-All documented capabilities are intended to match the actual implementation state of the project.
+The Terraform configuration, documentation, Git history, and validation evidence reflect the actual implementation state of the project.
+
+No live AWS infrastructure is claimed until real provisioning and validation are completed.
