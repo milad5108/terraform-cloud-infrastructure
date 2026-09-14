@@ -2,9 +2,9 @@
 
 A portfolio-focused Infrastructure as Code project built with Terraform and AWS.
 
-This project demonstrates how cloud infrastructure can be defined, structured, validated, and version-controlled using Terraform.
+This project demonstrates how cloud infrastructure can be defined, structured, validated, secured, and version-controlled using Terraform.
 
-> Note: The current project has been locally initialized and validated with Terraform. Real AWS provisioning has not yet been performed because an active AWS account with valid AWS credentials is not currently available.
+> Note: The current project has been locally initialized and validated with Terraform. Real AWS provisioning has not yet been performed because valid AWS account credentials are not currently available.
 
 ---
 
@@ -17,12 +17,13 @@ The main goals of this project are to demonstrate practical skills in:
 - AWS cloud infrastructure design
 - VPC networking
 - Public subnets
-- Security groups
+- Security Groups
 - EC2 compute
 - Application Load Balancer
 - Terraform variables and outputs
 - Infrastructure validation
 - Git and GitHub workflow
+- GitHub Actions CI validation
 
 ---
 
@@ -31,30 +32,53 @@ The main goals of this project are to demonstrate practical skills in:
 ```text
 Internet
    |
+   | HTTP : 80
    v
-Internet Gateway
+Application Load Balancer
+   |
+   | ALB Security Group
+   v
+Target Group
+   |
+   | HTTP : 80
+   v
+EC2 Security Group
    |
    v
-Public Route Table
+EC2 Instance
    |
-   +------------------+
-   |                  |
-   v                  v
-Public Subnet 1   Public Subnet 2
-AZ #1             AZ #2
-   \                  /
-    \                /
-     v              v
- Application Load Balancer
-            |
-            v
-       Target Group
-            |
-            v
-          EC2
-            |
-            v
-          Nginx
+   v
+Nginx
+```
+
+Network architecture:
+
+```text
+                    Internet
+                       |
+                       v
+               Internet Gateway
+                       |
+                       v
+               Public Route Table
+                  /           \
+                 /             \
+                v               v
+        Public Subnet 1   Public Subnet 2
+            AZ #1            AZ #2
+                 \           /
+                  \         /
+                   v       v
+          Application Load Balancer
+                     |
+                     v
+                Target Group
+                     |
+                     v
+                  EC2
+                     |
+                     v
+                   Nginx
 ```
 
 ---
@@ -69,7 +93,8 @@ The Terraform configuration currently includes:
 - Internet Gateway
 - Public Route Table
 - Route Table Associations
-- Web Security Group
+- Application Load Balancer Security Group
+- EC2 Security Group
 - Amazon Linux 2023 AMI lookup
 - EC2 Instance
 - Nginx installation using user data
@@ -79,6 +104,7 @@ The Terraform configuration currently includes:
 - HTTP Listener
 - Terraform Variables
 - Terraform Outputs
+- GitHub Actions Terraform validation workflow
 
 ---
 
@@ -86,6 +112,9 @@ The Terraform configuration currently includes:
 
 ```text
 terraform-cloud-infrastructure/
+├── .github/
+│   └── workflows/
+│       └── terraform.yml
 ├── terraform/
 │   ├── main.tf
 │   ├── variables.tf
@@ -137,28 +166,49 @@ An Internet Gateway and public route table provide internet routing for the publ
 
 ---
 
-## Security
+## Security Architecture
 
-Inbound ports currently configured:
+The project uses separate Security Groups for the Application Load Balancer and EC2 instance.
 
-```text
-80 - HTTP
-22 - SSH
-```
+### Application Load Balancer Security Group
 
-HTTP access is currently allowed from:
+The ALB Security Group allows public HTTP traffic:
 
 ```text
-0.0.0.0/0
+TCP 80
+Source: 0.0.0.0/0
 ```
 
-SSH is also currently configured as:
+### EC2 Security Group
+
+The EC2 Security Group allows HTTP traffic only from the Application Load Balancer Security Group:
 
 ```text
-0.0.0.0/0
+TCP 80
+Source: ALB Security Group
 ```
 
-This SSH rule should be restricted to a trusted IP address before any real deployment.
+The EC2 instance does not currently expose SSH access.
+
+This removes the previous public SSH rule and prevents direct public HTTP access to the EC2 instance through the Security Group.
+
+Traffic flow:
+
+```text
+Internet
+   |
+   v
+ALB Security Group
+   |
+   v
+Application Load Balancer
+   |
+   v
+EC2 Security Group
+   |
+   v
+EC2 Instance
+```
 
 Terraform state files, variable files, private keys, environment files, and other sensitive files are excluded through `.gitignore`.
 
@@ -179,7 +229,7 @@ t3.micro
 Terraform user data automatically:
 
 1. Installs Nginx
-2. Enables Nginx
+2. Enables the Nginx service
 3. Starts Nginx
 4. Creates a simple HTML test page
 
@@ -246,7 +296,7 @@ The project currently defines outputs for:
 
 ---
 
-## Validation
+## Local Terraform Validation
 
 The following Terraform commands have been successfully completed:
 
@@ -272,7 +322,36 @@ Observed error:
 Error: No valid credential sources found
 ```
 
-This means the project has reached the current boundary of what can be verified locally without an authenticated AWS account.
+This represents the current boundary of what can be verified locally without an authenticated AWS account.
+
+---
+
+## GitHub Actions CI
+
+The repository includes an automated Terraform validation workflow using GitHub Actions.
+
+The workflow runs automatically on:
+
+- Pushes to `main`
+- Pull requests targeting `main`
+
+The CI workflow performs:
+
+```bash
+terraform fmt -check
+terraform init -backend=false
+terraform validate
+```
+
+The GitHub Actions workflow has been successfully executed and passed.
+
+Workflow:
+
+```text
+.github/workflows/terraform.yml
+```
+
+This provides automated validation of the Terraform configuration on GitHub in addition to local validation.
 
 ---
 
@@ -303,6 +382,8 @@ Terraform configuration: COMPLETE
 Terraform initialization: COMPLETE
 Terraform formatting: COMPLETE
 Terraform validation: COMPLETE
+Security Group hardening: COMPLETE
+GitHub Actions CI validation: COMPLETE
 Terraform plan attempt: COMPLETED UNTIL AWS AUTHENTICATION
 
 AWS authentication: NOT AVAILABLE
@@ -334,11 +415,19 @@ Before real deployment:
 
 ## Terraform Workflow
 
-Current validated workflow:
+Current validated local workflow:
 
 ```bash
 terraform init
 terraform fmt
+terraform validate
+```
+
+Current CI workflow:
+
+```bash
+terraform fmt -check
+terraform init -backend=false
 terraform validate
 ```
 
@@ -355,7 +444,7 @@ Cleanup:
 terraform destroy
 ```
 
-At the current stage, the non-billable local validation workflow has been completed.
+At the current stage, the non-billable local and CI validation workflows have been completed.
 
 `terraform plan` was attempted but could not proceed beyond AWS authentication because valid credentials are not currently available.
 
@@ -384,21 +473,22 @@ It includes:
 
 ## Future Improvements
 
-Planned improvements:
+Possible future improvements include:
 
 - Real AWS deployment
 - Cloud-side validation
-- Restrict SSH access
-- Separate Load Balancer and EC2 Security Groups
 - HTTPS listener
-- ACM certificate integration
+- AWS Certificate Manager integration
+- Private subnets
+- Auto Scaling Group
 - Remote Terraform state
 - Terraform modules
-- CI validation workflow
-- Deployment evidence
 - Application Load Balancer health validation
 - EC2 connectivity validation
-- Destroy and cleanup validation
+- Deployment evidence
+- Terraform destroy and cleanup validation
+
+These improvements will only be documented as completed after they are actually implemented and verified.
 
 ---
 
@@ -406,6 +496,6 @@ Planned improvements:
 
 This project is part of a DevOps portfolio focused on practical and verifiable skills.
 
-The Terraform configuration, documentation, Git history, and validation evidence reflect the actual implementation state of the project.
+The Terraform configuration, security architecture, documentation, Git history, validation evidence, and GitHub Actions workflow reflect the actual implementation state of the project.
 
 No live AWS infrastructure is claimed until real provisioning and validation are completed.
